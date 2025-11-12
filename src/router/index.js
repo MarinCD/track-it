@@ -16,6 +16,12 @@ const routes = [
           import(/* webpackChunkName: "dashboard" */ '@/views/dashboard/Dashboard.vue'),
       },
       {
+        path: '/parametres',
+        name: 'Paramètres',
+        component: () =>
+          import(/* webpackChunkName: "dashboard" */ '@/views/user/ParametreUser.vue'),
+      },
+      {
         path: '/liste',
         name: 'Liste des pc',
         component: () => import(/* webpackChunkName: "liste" */ '@/views/dashboard/Liste.vue'),

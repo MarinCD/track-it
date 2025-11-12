@@ -20,6 +20,36 @@
 
         <br />
 
+        <!-- Pièces jointes existantes -->
+        <CCard class="mt-3" v-if="ticketFiles.length">
+          <CCardBody>
+            <CCardTitle>Pièces jointes</CCardTitle>
+            <ul>
+              <li
+                v-for="(file, index) in ticketFiles"
+                :key="index"
+                class="d-flex align-items-center justify-content-between"
+              >
+                <a :href="getFileUrl(file.file_name)" target="_blank">{{ file.file_name }}</a>
+                <button class="btn btn-sm btn-danger" @click="deleteAttachment(file.id)">Supprimer</button>
+              </li>
+            </ul>
+          </CCardBody>
+        </CCard>
+
+        <!-- Ajouter des fichiers -->
+        <CCard class="mt-3">
+          <CCardBody>
+            <CCardTitle>Ajouter des pièces jointes</CCardTitle>
+            <input type="file" multiple class="form-control" @change="handleFileUpload" />
+            <ul v-if="newAttachments.length" class="mt-2">
+              <li v-for="(file, index) in newAttachments" :key="index">{{ file.name }}</li>
+            </ul>
+          </CCardBody>
+        </CCard>
+
+        <br />
+
         <!-- Historique -->
         <CCard>
           <CCardBody>
@@ -68,7 +98,7 @@
           </CCardBody>
         </CCard>
         <div class="d-grid gap-2 mt-3">
-          <button class="btn btn-success mt-2 text-white" @click="updateTicket">
+          <button class="btn btn-success mt-2 text-white" @click="updateTicketWithAttachments">
             Sauvegarder Modification
           </button>
           <button class="btn btn-danger text-white" type="button" @click="deleteTicket">
@@ -117,8 +147,7 @@ export default {
   setup() {
     const route = useRoute()
     const router = useRouter()
-
-    const ticketId = route.params.id // ID du ticket
+    const ticketId = route.params.id
 
     const ticketData = ref({
       idTicket: '',
@@ -132,33 +161,33 @@ export default {
       updatedate: '',
     })
 
+    const ticketFiles = ref([]) // <-- fichiers existants
     const ticketResponses = ref([])
-
     const statuses = ref([])
     const newResponseMessage = ref('')
+    const newAttachments = ref([])
     const user = JSON.parse(localStorage.getItem('user'))
     const userId = user.id
     const idRole = user.role
 
-    // --- Récupérer les informations du ticket ---
     const fetchTicketData = async () => {
       try {
         const response = await axios.get(`/Support/consult_tickets.php?id=${ticketId}`)
         if (response.data?.ticket) {
+          const t = response.data.ticket
           ticketData.value = {
-            idTicket: response.data.ticket.idTicket,
-            titreTicket: response.data.ticket.titreTicket,
-            descriptionTicket: response.data.ticket.descriptionTicket,
-            categorie: response.data.ticket.libelleCategorie,
-            user: response.data.ticket.user,
-            priorite: response.data.ticket.Priorite,
-            status: response.data.ticket.idstatus,
-            createdate: response.data.ticket.createDate,
-            updatedate: response.data.ticket.UpdateDate,
+            idTicket: t.idTicket,
+            titreTicket: t.titreTicket,
+            descriptionTicket: t.descriptionTicket,
+            categorie: t.libelleCategorie,
+            user: t.user,
+            priorite: t.Priorite,
+            status: t.idstatus,
+            createdate: t.createDate,
+            updatedate: t.UpdateDate,
           }
-          ticketResponses.value = response.data.ticket.reponses || []
-        } else {
-          console.error('Aucune donnée trouvée pour cet ID')
+          ticketFiles.value = t.files || [] // <-- tableau depuis ticket_files
+          ticketResponses.value = t.reponses || []
         }
       } catch (error) {
         console.error('Erreur ticket :', error)
@@ -168,91 +197,93 @@ export default {
     const fetchStatuses = async () => {
       try {
         const response = await axios.get('/Support/Get_details.php')
-        if (response.data?.statuses) {
-          statuses.value = response.data.statuses
-        } else {
-          console.error('Erreur statuts')
-        }
+        if (response.data?.statuses) statuses.value = response.data.statuses
       } catch (error) {
         console.error('Erreur statuts :', error)
       }
     }
 
-    // --- Mettre à jour le ticket ---
-    const updateTicket = async () => {
-      const updatedTicket = {
-        idTicket: ticketData.value.idTicket,
-        status: ticketData.value.status, // <-- correction ici
-        priority: ticketData.value.priorite,
-      }
-
-      try {
-        const response = await axios.post('/Support/update_ticket.php', updatedTicket)
-        if (response.data.success) {
-          fetchTicketData()
-        } else {
-        }
-      } catch (error) {
-        console.error('Erreur de mise à jour du ticket:', error)
-      }
+    const handleFileUpload = (event) => {
+      newAttachments.value = Array.from(event.target.files)
     }
 
-    // --- Mettre à jour le ticket ---
-    const deleteTicket = async () => {
-      const updatedTicket = {
-        idTicket: ticketData.value.idTicket,
-      }
-
+    const updateTicketWithAttachments = async () => {
       try {
-        const response = await axios.post('/Support/delete_ticket.php', updatedTicket)
-        if (response.data.success) {
-          router.push(`/support`)
-        } else {
-        }
-      } catch (error) {
-        console.error('Erreur de mise à jour du ticket:', error)
-      }
-    }
+        const formData = new FormData()
+        formData.append('idTicket', ticketData.value.idTicket)
+        formData.append('status', ticketData.value.status)
+        formData.append('priority', ticketData.value.priorite)
+        newAttachments.value.forEach(file => formData.append('attachments[]', file))
 
-    // --- Formater les dates ---
-    const formatDate = (dateString) => {
-      if (!dateString) return ''
-      const date = new Date(dateString)
-      return date
-        .toLocaleString('fr-FR', {
-          hour: '2-digit',
-          minute: '2-digit',
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
+        const response = await axios.post('/Support/update_ticket.php', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
         })
-        .replace(',', ' -')
+
+        if (response.data.success) {
+          newAttachments.value = []
+          fetchTicketData()
+          alert('Ticket mis à jour avec succès')
+        } else {
+          alert('Erreur lors de la mise à jour')
+        }
+      } catch (error) {
+        console.error('Erreur mise à jour ticket :', error)
+        alert('Erreur lors de la mise à jour du ticket')
+      }
     }
 
-    // --- Enregistrer les réponses ---
-    const sendResponse = async () => {
-      if (!newResponseMessage.value.trim()) {
-        return
+    const deleteAttachment = async (fileId) => {
+      if (!confirm(`Supprimer ce fichier ?`)) return
+      try {
+        const response = await axios.post('/Support/delete_attachment.php', {
+          fileId
+        })
+        if (response.data?.success) {
+          ticketFiles.value = ticketFiles.value.filter(f => f.id !== fileId)
+        } else alert(response.data.message || 'Erreur suppression fichier')
+      } catch (error) {
+        console.error('Erreur suppression fichier :', error)
+        alert('Erreur lors de la suppression du fichier')
       }
+    }
 
+    const deleteTicket = async () => {
+      try {
+        const response = await axios.post('/Support/delete_ticket.php', { idTicket: ticketData.value.idTicket })
+        if (response.data.success) router.push(`/support`)
+      } catch (error) {
+        console.error('Erreur de suppression du ticket:', error)
+      }
+    }
+
+    const sendResponse = async () => {
+      if (!newResponseMessage.value.trim()) return
       try {
         const response = await axios.post('/Support/submit_response.php', {
           idTicket: ticketData.value.idTicket,
-          idUser: userId, // ici bien idUser
-          commentaire: newResponseMessage.value.trim(), // ici bien commentaire
+          idUser: userId,
+          commentaire: newResponseMessage.value.trim(),
         })
-
         if (response.data?.success) {
-          newResponseMessage.value = '' // Reset champ
-          fetchTicketData() // Recharge les réponses
-        } else {
+          newResponseMessage.value = ''
+          fetchTicketData()
         }
       } catch (error) {
         console.error('Erreur envoi de la réponse :', error)
       }
     }
 
-    // --- Au montage ---
+    const formatDate = (dateString) => {
+      if (!dateString) return ''
+      const date = new Date(dateString)
+      return date.toLocaleString('fr-FR', {
+        hour: '2-digit', minute: '2-digit',
+        day: '2-digit', month: '2-digit', year: 'numeric',
+      }).replace(',', ' -')
+    }
+
+    const getFileUrl = (fileName) => `https://localhost/api/Support/uploads/${fileName}`
+
     onMounted(() => {
       fetchTicketData()
       fetchStatuses()
@@ -260,15 +291,20 @@ export default {
 
     return {
       ticketData,
+      ticketFiles,
       ticketResponses,
       statuses,
       newResponseMessage,
-      sendResponse,
-      formatDate,
+      newAttachments,
       idRole,
-      updateTicket,
+      updateTicketWithAttachments,
       deleteTicket,
+      sendResponse,
+      deleteAttachment,
+      handleFileUpload,
+      formatDate,
+      getFileUrl
     }
-  },
+  }
 }
 </script>

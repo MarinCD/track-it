@@ -3,7 +3,46 @@
   <br /><br />
   <CContainer>
     <CRow>
-      <CCol>
+      <!-- Colonne gauche : directives et délais -->
+      <CCol md="4">
+        <CCard class="mb-4">
+          <CCardBody>
+            <h5 class="fw-bold mb-3">Directives de soumission</h5>
+            <ul class="list-unstyled">
+              <li class="mb-3">
+                ⚠️ <strong>Soyez descriptif</strong><br />
+                Incluez autant de détails que possible sur le problème.
+              </li>
+              <li class="mb-3">
+                🧭 <strong>Étapes pour reproduire</strong><br />
+                Décrivez les étapes exactes ayant mené au problème.
+              </li>
+              <li class="mb-3">
+                📸 <strong>Captures d’écran</strong><br />
+                Joignez des captures d’écran ou des messages d’erreur si possible.
+              </li>
+            </ul>
+
+            <hr />
+
+            <h5 class="fw-bold mb-3">Délai de réponse estimé</h5>
+            <ul class="list-unstyled">
+              <li class="mb-2">
+                <span class="badge bg-danger">Priorité Élevée</span> &lt; 2 heures
+              </li>
+              <li class="mb-2">
+                <span class="badge bg-warning text-dark">Priorité moyenne</span> &lt; 8 heures
+              </li>
+              <li>
+                <span class="badge bg-secondary">Priorité faible</span> &lt; 24 heures
+              </li>
+            </ul>
+          </CCardBody>
+        </CCard>
+      </CCol>
+
+      <!-- Colonne droite : formulaire -->
+      <CCol md="8">
         <CCard>
           <CCardBody>
             <CCardTitle class="text-center">Formulaire de création de ticket</CCardTitle>
@@ -20,10 +59,12 @@
                   </option>
                 </select>
               </CListGroupItem>
+
               <CListGroupItem>
-                <label for="os">Système d'exploitation</label>
+                <label for="os">Système d’exploitation</label>
                 <input type="text" id="os" v-model="ticketData.os" class="form-control" readonly />
               </CListGroupItem>
+
               <CListGroupItem>
                 <label for="priority">Priorité</label>
                 <select id="priority" v-model="ticketData.priority" class="form-control">
@@ -32,26 +73,38 @@
                   <option value="Élevée">Élevée</option>
                 </select>
               </CListGroupItem>
+
               <CListGroupItem>
                 <label for="title">Titre</label>
-                <input
-                  type="text"
-                  id="title"
-                  v-model="ticketData.title"
-                  class="form-control"
-                  required
-                />
+                <input type="text" id="title" v-model="ticketData.title" class="form-control" required />
               </CListGroupItem>
+
               <CListGroupItem>
                 <label for="description">Description</label>
-                <textarea
-                  id="description"
-                  v-model="ticketData.description"
+                <textarea id="description" v-model="ticketData.description" class="form-control" required></textarea>
+              </CListGroupItem>
+
+              <!-- 📎 Nouveau champ pour pièces jointes -->
+              <CListGroupItem>
+                <label for="attachments">Pièces jointes (captures, documents...)</label>
+                <input
+                  type="file"
+                  id="attachments"
                   class="form-control"
-                  required
-                ></textarea>
+                  multiple
+                  @change="handleFileUpload"
+                />
+                <small class="text-muted">
+                  Formats acceptés : JPG, PNG, PDF, DOCX...
+                </small>
+                <ul v-if="attachments.length" class="mt-2">
+                  <li v-for="(file, index) in attachments" :key="index">
+                    {{ file.name }}
+                  </li>
+                </ul>
               </CListGroupItem>
             </CListGroup>
+
             <div class="d-grid gap-2 mt-3">
               <button class="btn btn-primary" type="button" @click="submitTicket">Soumettre</button>
             </div>
@@ -63,12 +116,11 @@
 </template>
 
 <script setup>
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { ref, onMounted } from 'vue'
 import { CRow, CCol, CCard, CCardBody, CCardTitle, CListGroup, CListGroupItem } from '@coreui/vue'
 import axios from '@/plugins/axios'
 
-// Define reactive data properties for ticket and categories
 const ticketData = ref({
   category: '',
   os: '',
@@ -78,23 +130,22 @@ const ticketData = ref({
 })
 
 const categories = ref([])
+const attachments = ref([])
 const router = useRouter()
 
-// Detect OS
+// Détection du système d’exploitation
 const detectOS = () => {
   const userAgent = window.navigator.userAgent
-  let os = 'Unknown OS'
-
-  if (userAgent.indexOf('Win') !== -1) os = 'Windows'
-  else if (userAgent.indexOf('Mac') !== -1) os = 'MacOS'
-  else if (userAgent.indexOf('Linux') !== -1) os = 'Linux'
-  else if (userAgent.indexOf('Android') !== -1) os = 'Android'
-  else if (userAgent.indexOf('like Mac') !== -1) os = 'iOS'
-
+  let os = 'Inconnu'
+  if (userAgent.includes('Win')) os = 'Windows'
+  else if (userAgent.includes('Mac')) os = 'MacOS'
+  else if (userAgent.includes('Linux')) os = 'Linux'
+  else if (userAgent.includes('Android')) os = 'Android'
+  else if (userAgent.includes('like Mac')) os = 'iOS'
   ticketData.value.os = os
 }
 
-// Fetch categories from the API
+// Récupération des catégories
 const fetchCategories = async () => {
   try {
     const response = await axios.get('/Support/Get_details.php')
@@ -109,31 +160,39 @@ const fetchCategories = async () => {
   }
 }
 
-// Submit ticket
+// Gérer les fichiers sélectionnés
+const handleFileUpload = (event) => {
+  attachments.value = Array.from(event.target.files)
+}
+
+// Soumission du ticket
 const user = JSON.parse(localStorage.getItem('user'))
 const userId = user ? user.id : null
+
 const submitTicket = async () => {
   try {
-    const response = await axios.post(
-      '/Support/submit_ticket.php',
-      {
-        category: ticketData.value.category,
-        os: ticketData.value.os,
-        priority: ticketData.value.priority,
-        title: ticketData.value.title,
-        description: ticketData.value.description,
-        userid: userId,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      },
-    )
+    const formData = new FormData()
+    formData.append('category', ticketData.value.category)
+    formData.append('os', ticketData.value.os)
+    formData.append('priority', ticketData.value.priority)
+    formData.append('title', ticketData.value.title)
+    formData.append('description', ticketData.value.description)
+    formData.append('userid', userId)
+
+    // Ajout des fichiers
+    attachments.value.forEach((file, i) => {
+      formData.append(`attachments[]`, file)
+    })
+
+    const response = await axios.post('/Support/submit_ticket.php', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
 
     if (response.data.success) {
-      router.push(`/support`)
+      alert('Ticket créé avec succès.')
+      router.push('/support')
     } else {
+      alert('Erreur lors de la soumission du ticket.')
     }
   } catch (error) {
     console.error('Erreur lors de la soumission du ticket:', error)
@@ -141,9 +200,14 @@ const submitTicket = async () => {
   }
 }
 
-// On component mount, detect OS and fetch categories
 onMounted(() => {
   detectOS()
   fetchCategories()
 })
 </script>
+
+<style scoped>
+.badge {
+  font-size: 0.9rem;
+}
+</style>

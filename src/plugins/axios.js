@@ -3,7 +3,7 @@ import axios from 'axios'
 // Configuration de l'instance Axios
 const instance = axios.create({
   withCredentials: false,
-  baseURL: 'https://10.29.128.180/apisimple/',
+  baseURL: 'https://localhost/api/',
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
