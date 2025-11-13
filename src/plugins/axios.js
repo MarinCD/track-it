@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // Configuration de l'instance Axios
 const instance = axios.create({
-  withCredentials: false,
+  withCredentials: true,
   baseURL: 'https://localhost/api/',
   headers: {
     Accept: 'application/json',

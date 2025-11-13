@@ -12,7 +12,7 @@ const data = ref({
   labels: [],
   datasets: [
     {
-      label: 'Tickets par mois',
+      label: 'Contacts par mois',
       backgroundColor: `rgba(${getStyle('--cui-info-rgb')}, .1)`,
       borderColor: getStyle('--cui-info'),
       pointHoverBackgroundColor: getStyle('--cui-info'),

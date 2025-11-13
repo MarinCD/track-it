@@ -42,4 +42,10 @@ export default [
       },
     ],
   },
+  {
+    component: 'CNavItem',
+    name: 'Organization',
+    to: '/organisation',
+    icon: 'cil-layers',
+  },
 ]
